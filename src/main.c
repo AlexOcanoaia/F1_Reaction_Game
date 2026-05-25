@@ -4,6 +4,8 @@
 #include <string.h>
 #include <avr/delay.h>
 #include <avr/interrupt.h>
+#include "timers.h"
+#include <stdlib.h>
 
 #define POTENTIOMETER_CHANNEL 1 // ADC1 (PC1)
 
@@ -24,8 +26,12 @@ GamePhase phase = STARTING_GAME;
  */
 
 void gpio_init() {
+    // Button 1 (Start and End)
     DDRD &= ~(1 << PD2);
     PORTD |= (1 << PD2);
+
+    // Player 1 Buttons
+    DDRD |= (1 << PD7) | (1 << PD6) | (1 << PD5);
 }
 
 void interupts_init() {
@@ -44,17 +50,47 @@ ISR(PCINT2_vect) {
     }
 }
 
+uint8_t score1 = 0;
+uint8_t score2 = 0;
+uint8_t player1_led1 = 0, player1_led2 = 0, player1_led3 = 0;
+
+void turn_led(int player, int led) {
+    if (player == 1) {
+        if (led == 0) {
+            PORTD &= ~((1 << PD6) | (1 << PD5));
+            PORTD |= (1 << PD7);
+            player1_led1 = 1; player1_led2 = 0; player1_led3 = 0;
+        } else if (led == 1) {
+            PORTD &= ~((1 << PD7) | (1 << PD5));
+            PORTD |= (1 << PD6);
+            player1_led1 = 0; player1_led2 = 1; player1_led3 = 0;
+        } else {
+            PORTD &= ~((1 << PD7) | (1 << PD6));
+            PORTD |= (1 << PD5);
+            player1_led1 = 0; player1_led2 = 0; player1_led3 = 1;
+        }
+    }
+}
+
+uint8_t player1_pressed = 0;
+uint8_t player2_pressed = 0;
+
+#define PLAYER1 1
+#define PLAYER2 2
+
 int main() {
     Usart_init(MYUBRR);
     Usart_print("Hello\r\n");
     adc_init();
     gpio_init();
     interupts_init();
+    init_timer1_ctc();
     sei();
 
     char player1_name[20], player2_name[20]; 
     uint8_t read_names = 0;
     uint8_t choice = 0, previous_choice = 0;
+    uint8_t previous_time = 0;
     while (1) {
         if (phase == STARTING_GAME) {
             if (!read_names) {
@@ -83,17 +119,62 @@ int main() {
                 if (choice != previous_choice) {
                     if (choice == 0) {
                         Usart_print("15 seconds\r\n");
+                        duration_of_the_game = 15;
+                        previous_time = 15;
                     } else if (choice == 1) {
                         Usart_print("30 seconds\r\n");
+                        duration_of_the_game = 30;
+                        previous_time = 30;
                     } else if (choice == 2) {
                         Usart_print("60 seconds\r\n");
+                        duration_of_the_game = 60;
+                        previous_time = 60;
                     }
                     previous_choice = choice;
                 }
             }
             phase = GAME;
+            TCCR1B |= (1 << CS12) | (1 << CS10);
         } else if (phase == GAME) {
-            Usart_print("Starting game\r\n");
+            if (duration_of_the_game != previous_time) {
+                char buffer[20];
+                sprintf(buffer, "Time: 00:%u\n", duration_of_the_game);
+                Usart_print(buffer);
+                previous_time = duration_of_the_game;
+            }
+
+            if (!player1_pressed) {
+                turn_led(PLAYER1, rand() % 3);
+                player1_pressed = 1;
+            }
+
+            while (player1_pressed && duration_of_the_game > 0) {
+                uint16_t value = read_channel(0);
+
+                if (value > 230 && value < 300 && player1_led1) {
+                    PORTD &= ~(1 << PD7);
+                    player1_pressed = 0;
+                } else if (value > 490 && value < 600 && player1_led2) {
+                    PORTD &= ~(1 << PD6);
+                    player1_pressed = 0;
+                } else if (value > 700 && player1_led3) {
+                    PORTD &= ~(1 << PD5);
+                    player1_pressed = 0;
+                }
+            }
+            if (!player1_pressed) {
+                score1++;
+            }
+            char buffer_score[20];
+            sprintf(buffer_score, "Score: %u\n", score1);
+            Usart_print(buffer_score);
+            if (duration_of_the_game == 0) {
+                phase = END_GAME;
+                TCCR1B &= ~((1 << CS12) | (1 << CS10));
+            }
+        } else if (phase == END_GAME) {
+            Usart_print("The End of the game\n");
+
         }
     }
     return 0;

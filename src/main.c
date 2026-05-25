@@ -6,18 +6,8 @@
 #include <avr/interrupt.h>
 #include "timers.h"
 #include <stdlib.h>
+#include "utils.h"
 
-#define PLAYER1_CHANNEL 0
-#define PLAYER2_CHANNEL 1
-#define POTENTIOMETER_CHANNEL 2 
-
-typedef enum {
-    STARTING_GAME,
-    GAME,
-    END_GAME
-} GamePhase;
-
-GamePhase phase = STARTING_GAME;
 
 /**
  * ADC values is [0, 1023],
@@ -27,38 +17,42 @@ GamePhase phase = STARTING_GAME;
  * [683, 1023] -> 60 seconds
  */
 
-void gpio_init() {
-    // Button 1 (Start and End)
-    DDRB &= ~(1 << PB0);
-    PORTB |= (1 << PB0);
-
-    // Player 1 Buttons
-    DDRD |= (1 << PD7) | (1 << PD6) | (1 << PD5);
-    
-    // Player 2 buttons
-    DDRD |= (1 << PD4) | (1 << PD3) | (1 << PD2);
-}
-
-void interupts_init() {
-    PCICR |= (1 << PCIE0);
-    PCMSK0 |= (1 << PCINT0);
-}
-
 volatile uint8_t is_game_starting = 0;
-uint8_t start = 0;
+uint8_t start = 0, finish = 0;
+uint8_t score1 = 0;
+uint8_t score2 = 0;
+uint8_t player1_pressed = 0;
+uint8_t player2_pressed = 0;
+uint8_t player1_leds[] = {0, 0, 0};
+uint8_t player2_leds[] = {0, 0, 0};
+uint8_t previous_time = 0;
+GamePhase phase = STARTING_GAME;
+char player1_name[20], player2_name[20]; 
+
 
 ISR(PCINT0_vect) {
     if (!(PINB & (1 << PB0))) {
-        if (phase == STARTING_GAME && !start) {
+        if (phase == STARTING_GAME && start) {
             is_game_starting = 1;
+        }
+
+        if (phase == END_GAME && finish) {
+            phase = STARTING_GAME;
+            score1 = 0;
+            score2 = 0;
+            start = 0;
+            finish = 0;
+            is_game_starting = 0;
+            previous_time = 0;
+            player1_pressed = 0;
+            player2_pressed = 0;
+            player1_leds[0] = 0; player1_leds[1] = 0; player1_leds[2] = 0;
+            player2_leds[0] = 0; player2_leds[1] = 0; player2_leds[2] = 0;
+            memset(player1_name, 0, sizeof(player1_name));
+            memset(player2_name, 0, sizeof(player2_name));
         }
     }
 }
-
-uint8_t score1 = 0;
-uint8_t score2 = 0;
-uint8_t player1_leds[] = {0, 0, 0};
-uint8_t player2_leds[] = {0, 0, 0};
 
 void turn_led(int player, int led) {
     if (player == 1) {
@@ -92,12 +86,6 @@ void turn_led(int player, int led) {
     }
 }
 
-uint8_t player1_pressed = 0;
-uint8_t player2_pressed = 0;
-
-#define PLAYER1 1
-#define PLAYER2 2
-
 int check_correct_button(int value, int player) {
     int zone1 = (value > 230 && value < 300);
     int zone2 = (value > 490 && value < 600);
@@ -118,7 +106,6 @@ int check_correct_button(int value, int player) {
     return 0;
 }
 
-uint8_t previous_time = 0;
 
 void show_time() {
     if (duration_of_the_game != previous_time) {
@@ -129,10 +116,10 @@ void show_time() {
     }
 }
 
-void show_game_score(uint8_t *score) {
+void show_game_score(uint8_t *score, int player) {
     *score += 1;
     char score_buffer[20];
-    sprintf(score_buffer, "P1 Score: %u\n", *score);
+    sprintf(score_buffer, "%s Score: %u\n", (player == PLAYER1) ? player1_name : player2_name, *score);
     Usart_print(score_buffer);
 }
 
@@ -144,15 +131,16 @@ int main() {
     init_timer1_ctc();
     sei();
 
-    char player1_name[20], player2_name[20]; 
     uint8_t read_names = 0;
     uint8_t choice = 0, previous_choice = 0;
     uint8_t none_button_pressed1 = 1, none_button_pressed2 = 1;
     uint8_t count = 0;
     uint8_t contor = 0;
-    uint8_t tmp = 0;
     while (1) {
         if (phase == STARTING_GAME) {
+            read_names = 0; choice = 0; previous_choice = 0;
+            none_button_pressed1 = 1; none_button_pressed2 = 1;
+            count = 0; contor = 0;
             if (!read_names) {
                 Usart_print("Enter Player 1 name: ");
                 Usart_read_string(player1_name, 20);
@@ -190,8 +178,8 @@ int main() {
                     }
                     previous_choice = choice;
                 }
+                start = 1;
             }
-            start = 1;
             phase = GAME;
             TCCR1B |= (1 << CS12) | (1 << CS10);
         } else if (phase == GAME) {
@@ -239,7 +227,7 @@ int main() {
                     int check = check_correct_button(player1_value, PLAYER1);
                     if (check) {
                         player1_pressed = 0;
-                        show_game_score(&score1);
+                        show_game_score(&score1, PLAYER1);
                     }
                 }
 
@@ -247,21 +235,24 @@ int main() {
                     int check = check_correct_button(player2_value, PLAYER2);
                     if (check) {
                         player2_pressed = 0;
-                        show_game_score(&score2);
+                        show_game_score(&score2, PLAYER2);
                     }
                 }
             }
 
-            if (duration_of_the_game == 0) {
-                phase = END_GAME;
-                TCCR1B &= ~((1 << CS12) | (1 << CS10));
-            }
+            phase = END_GAME;
+            TCCR1B &= ~((1 << CS12) | (1 << CS10));
         } else if (phase == END_GAME) {
-            if (!tmp) {
+            if (score1 == score2 && !finish) {
+                Usart_print("Is a tie\n");
+                finish = 1;
+            }
+
+            if (!finish) {
                 char buf[20];
                 sprintf(buf, "%s wins\n", (score1 > score2) ? player1_name : player2_name);
                 Usart_print(buf);
-                tmp = 1;
+                finish = 1;
             }
         }
     }

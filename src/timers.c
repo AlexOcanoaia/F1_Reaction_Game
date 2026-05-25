@@ -1,5 +1,7 @@
 #include "timers.h"
 
+volatile uint8_t duration_of_the_game;
+
 void init_timer1_ctc() {
     TCCR1B |= (1 << WGM12); // starting the ctc mode
 
@@ -11,7 +13,7 @@ void init_timer1_ctc() {
 }
 
 ISR(TIMER1_COMPA_vect) {
-    if (duration_of_the_game >= 0) {
+    if (duration_of_the_game > 0) {
         duration_of_the_game--;
     }
 }

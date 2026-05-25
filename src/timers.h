@@ -5,7 +5,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
     
-volatile uint8_t duration_of_the_game;
+extern volatile uint8_t duration_of_the_game;
 
 void init_timer1_ctc();
 

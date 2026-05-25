@@ -16,5 +16,6 @@ char Usart_receive();
 
 void Usart_print(const char *data);
 
+void Usart_read_string(char *buf, int length);
 
 #endif

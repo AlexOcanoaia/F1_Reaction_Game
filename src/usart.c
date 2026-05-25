@@ -25,3 +25,27 @@ void Usart_print(const char *data) {
         data++;
     }
 }
+
+void Usart_read_string(char *buf, int length) {
+    if (!buf)
+        return;
+
+    char data;
+    int l = 0;
+    while (1) {
+        data = Usart_receive();
+
+        if ((data == '\r' || data == '\n') && l == 0)
+            continue;
+
+        if (data == '\n' || data == '\r') {
+            buf[l++] = '\0';
+            return;
+        }
+
+        if (l < (length - 1)) {
+            buf[l++] = data;
+        }
+        Usart_transmit(data);
+    }
+}

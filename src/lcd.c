@@ -77,3 +77,8 @@ void lcd_init() {
     lcd_cmd(0x0C);
     _delay_ms(1);
 }
+
+void lcd_clear() {
+    lcd_cmd(0x01);
+    _delay_ms(2);
+}

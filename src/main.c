@@ -110,9 +110,12 @@ int check_correct_button(int value, int player) {
 void show_time() {
     if (duration_of_the_game != previous_time) {
         char time_buffer[20];
-        sprintf(time_buffer, "Time 00:%02u\n", duration_of_the_game);
-        Usart_print(time_buffer);
+        sprintf(time_buffer, "Time 00:%02u", duration_of_the_game);
+        // Usart_print(time_buffer);
         previous_time = duration_of_the_game;
+        lcd_clear();
+        lcd_set_cursor(0, 3);
+        lcd_print(time_buffer);
     }
 }
 
@@ -133,7 +136,7 @@ int main() {
     lcd_init();
 
     lcd_set_cursor(0, 0);
-    lcd_print("Start the game");
+    // lcd_print("Start the game");
     sei();
 
     uint8_t read_names = 0;
@@ -147,16 +150,22 @@ int main() {
             none_button_pressed1 = 1; none_button_pressed2 = 1;
             count = 0; contor = 0;
             if (!read_names) {
+                lcd_clear();
+                lcd_set_cursor(0, 0);
+                lcd_print("Player 1 name: ");
                 Usart_print("Enter Player 1 name: ");
                 Usart_read_string(player1_name, 20);
                 Usart_print("\n");
 
+                lcd_set_cursor(0, 0);
+                lcd_print("Player 2 name: ");
                 Usart_print("Enter Player 2 name: ");
                 Usart_read_string(player2_name, 20);
                 Usart_print("\n");
 
                 read_names = 1;
             }
+            lcd_clear();
             while (!is_game_starting) {
                 uint16_t result = read_channel(POTENTIOMETER_CHANNEL);
                 if (result <= 320) {
@@ -168,15 +177,20 @@ int main() {
                 }
 
                 if (choice != previous_choice) {
+                    lcd_clear();
+                    lcd_set_cursor(0, 0);
                     if (choice == 0) {
+                        lcd_print("15 seconds");
                         Usart_print("15 seconds\r\n");
                         duration_of_the_game = 15;
                         previous_time = 15;
                     } else if (choice == 1) {
+                        lcd_print("30 seconds");
                         Usart_print("30 seconds\r\n");
                         duration_of_the_game = 30;
                         previous_time = 30;
                     } else if (choice == 2) {
+                        lcd_print("60 seconds");
                         Usart_print("60 seconds\r\n");
                         duration_of_the_game = 60;
                         previous_time = 60;
@@ -188,7 +202,6 @@ int main() {
             phase = GAME;
             TCCR1B |= (1 << CS12) | (1 << CS10);
         } else if (phase == GAME) {
-            Usart_print("start\n");
             while (duration_of_the_game) {
                 uint16_t player1_value = read_channel(PLAYER1_CHANNEL);
                 uint16_t player2_value = read_channel(PLAYER2_CHANNEL);
@@ -249,16 +262,31 @@ int main() {
             TCCR1B &= ~((1 << CS12) | (1 << CS10));
         } else if (phase == END_GAME) {
             if (score1 == score2 && !finish) {
-                Usart_print("Is a tie\n");
+                // Usart_print("Is a tie\n");
+                PORTD &= ~((1 << PD7) | (1 << PD6) | (1 << PD5));
+                PORTD &= ~((1 << PD4) | (1 << PD3) | (1 << PD2));
+                lcd_clear();
+                lcd_set_cursor(0, 0);
+                lcd_print("  TIE  ");
                 finish = 1;
             }
 
             if (!finish) {
-                char buf[20];
-                sprintf(buf, "%s wins\n", (score1 > score2) ? player1_name : player2_name);
-                Usart_print(buf);
+                char buf[20], score_buffer[20];
+                sprintf(buf, "   %s wins", (score1 > score2) ? player1_name : player2_name);
+                // Usart_print(buf);
+                lcd_clear();
+                lcd_set_cursor(0, 0);
+                lcd_print(buf);
+                lcd_set_cursor(1, 0);
+                sprintf(score_buffer, "   Score: %u", (score1 > score2) ? score1 : score2);
+                lcd_print(score_buffer);
                 finish = 1;
             }
+            
+            _delay_ms(1000);
+            lcd_set_cursor(1, 0);
+            lcd_print("Play again?");
         }
     }
     return 0;

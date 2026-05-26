@@ -30,4 +30,7 @@ void lcd_set_cursor(uint8_t row, uint8_t col);
 void lcd_print(char *s);
 
 void lcd_init();
+
+void lcd_clear();
+
 #endif

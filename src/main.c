@@ -274,7 +274,8 @@ int main() {
             if (!finish) {
                 char buf[20], score_buffer[20];
                 sprintf(buf, "   %s wins", (score1 > score2) ? player1_name : player2_name);
-                // Usart_print(buf);
+                PORTD &= ~((1 << PD7) | (1 << PD6) | (1 << PD5));
+                PORTD &= ~((1 << PD4) | (1 << PD3) | (1 << PD2));
                 lcd_clear();
                 lcd_set_cursor(0, 0);
                 lcd_print(buf);

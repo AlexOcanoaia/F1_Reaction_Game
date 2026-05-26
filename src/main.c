@@ -7,7 +7,8 @@
 #include "timers.h"
 #include <stdlib.h>
 #include "utils.h"
-
+#include "i2c.h"
+#include "lcd.h"
 
 /**
  * ADC values is [0, 1023],
@@ -28,7 +29,6 @@ uint8_t player2_leds[] = {0, 0, 0};
 uint8_t previous_time = 0;
 GamePhase phase = STARTING_GAME;
 char player1_name[20], player2_name[20]; 
-
 
 ISR(PCINT0_vect) {
     if (!(PINB & (1 << PB0))) {
@@ -129,6 +129,11 @@ int main() {
     gpio_init();
     interupts_init();
     init_timer1_ctc();
+    i2c_init();
+    lcd_init();
+
+    lcd_set_cursor(0, 0);
+    lcd_print("Start the game");
     sei();
 
     uint8_t read_names = 0;

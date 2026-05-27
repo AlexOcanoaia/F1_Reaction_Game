@@ -10,6 +10,8 @@ void gpio_init() {
     
     // Player 2 buttons
     DDRD |= (1 << PD4) | (1 << PD3) | (1 << PD2);
+
+    DDRB |= (1 << PB3);
 }
 
 void interupts_init() {

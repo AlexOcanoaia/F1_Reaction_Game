@@ -287,7 +287,8 @@ int main() {
             
             _delay_ms(1000);
             lcd_set_cursor(1, 0);
-            lcd_print("Play again?");
+            lcd_print("   Play again?");
+            play_music();
         }
     }
     return 0;
